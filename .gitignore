@@ -1,13 +1,219 @@
-# Compiled Object files
-*.slo
-*.lo
-*.o
+#include<stdio.h>
+#include<string.h>
+#include<vector>
+#include<stack>
+#include<queue>
+using namespace std;
+FILE *f,*g;
 
-# Compiled Dynamic libraries
-*.so
-*.dylib
+struct trans{
 
-# Compiled Static libraries
-*.lai
-*.la
-*.a
+    int a1,b1,c1,d1,a2,b2,c2,d2;
+}schimb[51];
+
+int k, m;                    //k este nr caractere, m este numarul de elemente din before
+
+int comb[35][35];            //comb reprezinta combinarile
+
+int words[31][31][31]; int weigth[27000]; int n;          //words reprezinta nr ordine al cuvant cu i de a, j de b si k de c; weigth greutatea cuvant cu nr ordine coresp si n nr de noduri in graf
+
+vector<int> graph[5500];     //graful, unde cuvintele sunt reprezentate prin numere de ordine
+
+vector<vector<int > > comp; int ncomp, nrcomp[5500]; stack<int> stackdfs;                //vectorul cu elementele componentelor; ncomp este nr curent de componente si nrcomp e vector cu componenta fiecarui varf
+
+vector<int> dag[5500];  int dagweigth[5500]; int putere[5500]; int grad[5500];                                  //dagul facut din graph
+
+int depth[5500], updepth[5500];                            //adancime si adancime minima subarbore
+
+bool seen[5500];                                            //daca a fost vizitat
+void read(void){
+
+    f=fopen("impossiblegame.in","r");
+    g=fopen("impossiblegame.out","w");
+
+    fscanf(f,"%d%d",&k,&m);
+    
+    int i;  char c1[50],c2[50];
+    for(i=1;i<=m;i++){
+
+        fscanf(f,"%s%s",c1,c2);
+
+        int j;
+        for(j=0; j <=(int) strlen(c1)-1; ++j)
+            if (c1[j] == 'A') schimb[i].a1++;
+            else if(c1[j] == 'B') schimb[i].b1++;
+                else if (c1[j] == 'C') schimb[i].c1++;
+                    else if (c1[j] == 'D') schimb[i].d1++;
+        for (j=0 ;j <=(int) strlen(c2)-1; j++)
+             if (c2[j] == 'A') schimb[i].a2++;
+             else if (c2[j] == 'B') schimb[i].b2++;
+                else if (c2[j] == 'C') schimb[i].c2++;
+                    else if (c2[j] == 'D') schimb[i].d2++;
+    }
+}
+
+void aflacombinari(int k){
+
+    int i,j;
+    for(i=0 ; i<=k ; i++)
+        for(j=0 ; j<=i ;j++)
+            if (j == 0) comb[i][j]=1;
+            else comb[i][j]= (comb[i-1][j-1] * i)/j;
+}
+
+
+void init(int k){
+
+    int i,j,l;                 //contori de numarare
+    for(i=0 ; i<=k; i++){
+        for(j=0 ; j<=k-i ;j++){
+                for( l=0 ; l<=k-i-j; l++){
+                    words[i][j][l] = ++n;
+                    weigth[n] = comb[k][i] * comb[k-i][j] * comb[k-i-j][l];
+
+                }
+        }
+    }
+}
+
+void makegraph(int k){
+
+    int i,j,l,h;               //aceeasi contori de numarare
+    for (i=0; i<=k; i++)
+         for (j=0 ;j<=k-i; j++)
+             for( l=0; l<=k-i-j; l++){
+
+                for(h=1; h<=m; h++)
+                    if (i>= schimb[h].a1 && j >= schimb[h].b1 && l >= schimb[h].c1 && k-i-j-l >= schimb[h]. d1){
+
+                        graph[words[i][j][l]].push_back(words[i-schimb[h].a1+schimb[h].a2][j-schimb[h].b1+schimb[h].b2][l-schimb[h].c1+schimb[h].c2]);
+                    }
+             }
+}
+
+void dfs(int v){
+
+    updepth[v]=depth[v];
+    stackdfs.push(v);
+    
+    vector<int>::iterator it=graph[v].begin();   vector<int> componenta;            //in componenta vom retine ce trebuie adaugat in vectorul cu componente
+    while(it!=graph[v].end()){
+
+        if (!seen[*it]){
+
+            seen[*it]=1;
+            depth[*it]=depth[v]+1;
+            dfs(*it);
+            
+            if (updepth[*it] > depth[v]) {
+                componenta.clear(); ++ncomp;
+              
+                while (stackdfs.top() != v) {componenta.push_back(stackdfs.top()); nrcomp[stackdfs.top()] = ncomp; dagweigth[ncomp] += weigth[stackdfs.top()]; stackdfs.pop(); }
+         
+                comp.push_back(componenta);
+            }
+            else if (updepth[*it] < updepth[v]) updepth[v] = updepth[*it];
+            
+        }
+        else if (depth[*it] < updepth[v]) updepth[v]=depth[*it];
+
+        
+        it++;
+    }
+
+}
+
+void makedag(void){
+
+    int i; vector<int>::iterator it; vector<int> componenta;
+    for(i=1; i <= n; i++)
+         if (!seen[i]) {
+             seen[i]=1; 
+             dfs(i);
+                  
+             if (!stackdfs.empty()){
+
+                componenta.clear(); ncomp++;
+
+                while(!stackdfs.empty()) {componenta.push_back(stackdfs.top()); nrcomp[stackdfs.top()]=ncomp; dagweigth[ncomp] += weigth[stackdfs.top()]; stackdfs.pop();}
+
+                comp.push_back(componenta);
+             }
+             
+        }
+    
+    for(i=1; i<=n; i++){
+
+        it=graph[i].begin();
+        while(it!=graph[i].end()){
+            
+            if (nrcomp[*it]!=nrcomp[i]) {dag[nrcomp[*it]].push_back(nrcomp[i]);
+            grad[nrcomp[i]]++;}
+            
+            it++;
+        }
+    }
+            
+}
+
+void topsort(void){
+
+    queue<int> dagsort;
+
+    int i;
+    for(i=1;i<=ncomp;i++){
+
+        if (grad[i] == 0) {dagsort.push(i);  putere[i]=dagweigth[i];}
+    }
+
+    while ( ! dagsort.empty() ){
+
+        int curr=dagsort.front();
+        dagsort.pop();
+
+        vector<int>::iterator it;
+        it=dag[curr].begin();
+        while(it!=dag[curr].end()){
+        
+            if (putere[*it]<putere[curr]+dagweigth[*it]) putere[*it]=putere[curr]+dagweigth[*it];
+
+            if (! (--grad[*it])) dagsort.push(*it);
+
+            it++;
+
+        }
+    }
+
+
+}
+
+long long findmax(void){
+
+    int i; int maxim=-1;
+    for(i=1;i<=ncomp;i++) if (putere[i]>maxim) maxim=putere[i];
+    return maxim;
+}
+
+
+
+
+
+
+
+
+int main(void){
+
+   read();
+
+   aflacombinari(k);
+   init(k);
+
+   makegraph(k);
+   
+   makedag();
+   topsort();
+    
+   fprintf(g,"%d",findmax());
+   
+   return 0;
+}
